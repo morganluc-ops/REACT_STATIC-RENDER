@@ -1,6 +1,7 @@
 import * as React from "react";
 import type { Meta, StoryObj } from "@storybook/react";
 import { renderToString } from "react-dom/server";
+import { hydrateRoot } from "react-dom/client";
 import { useStatic } from "./useStatic";
 
 // A component that simulates a very heavy rendering task
@@ -10,42 +11,46 @@ const HeavyButtonComponent = React.forwardRef<
     id: string;
     label: string;
     onClick?: () => void;
-    simulatedHydrated?: boolean; // For display in non-hook story
   }
->(({ id, label, onClick, simulatedHydrated }, ref) => {
-  // Block the main thread for 50ms per button to simulate extremely complex layout/rendering.
-  // This will make rendering a list of buttons visibly slow without lazy hydration.
+>(({ id, label, onClick }, ref) => {
+  // Block the main thread for 50ms per button during render to simulate heavy components.
   const start = performance.now();
   while (performance.now() - start < 50) {
     // Thread blocking loop
   }
 
-  // Detect real client-side hydration (runs only after hydration completes)
+  // Track state for clicks
+  const [clicks, setClicks] = React.useState(0);
   const [isHydrated, setIsHydrated] = React.useState(false);
+
   React.useEffect(() => {
     setIsHydrated(true);
   }, []);
 
-  const active = simulatedHydrated !== undefined ? simulatedHydrated : isHydrated;
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setClicks((c) => c + 1);
+    if (onClick) onClick();
+  };
 
   return (
     <button
       ref={ref}
-      onClick={onClick}
+      onClick={handleClick}
       style={{
         padding: "16px",
         borderRadius: "10px",
         border: "2px solid",
-        borderColor: active ? "#10b981" : "#ef4444",
-        background: active
+        borderColor: isHydrated ? "#10b981" : "#ef4444",
+        background: isHydrated
           ? "linear-gradient(135deg, #065f46, #047857)"
           : "linear-gradient(135deg, #7f1d1d, #991b1b)",
         color: "#ffffff",
         cursor: "pointer",
         fontWeight: "bold",
         transition: "all 0.3s ease",
-        boxShadow: active ? "0 4px 12px rgba(16, 185, 129, 0.3)" : "none",
-        minWidth: "160px",
+        boxShadow: isHydrated ? "0 4px 12px rgba(16, 185, 129, 0.3)" : "none",
+        minWidth: "180px",
         outline: "none",
       }}
     >
@@ -53,15 +58,8 @@ const HeavyButtonComponent = React.forwardRef<
         {id}
       </div>
       <div style={{ margin: "6px 0", fontSize: "14px" }}>{label}</div>
-      <div
-        style={{
-          fontSize: "12px",
-          background: "rgba(0,0,0,0.2)",
-          padding: "4px 8px",
-          borderRadius: "4px",
-        }}
-      >
-        {active ? "🟢 Active (Hydrated)" : "🔴 Static (Deferred)"}
+      <div style={{ fontSize: "12px", background: "rgba(0,0,0,0.2)", padding: "4px 8px", borderRadius: "4px" }}>
+        {isHydrated ? `🟢 Active (Clicks: ${clicks})` : "🔴 Static (Deferred)"}
       </div>
     </button>
   );
@@ -88,20 +86,16 @@ export const WithLazyHydration: StoryObj = {
     const [hydrationStatus, setHydrationStatus] = React.useState<Record<string, boolean>>(() =>
       Object.fromEntries(componentIds.map((id) => [id, false]))
     );
-    const [mountTime, setMountTime] = React.useState(0);
+    const [hydrateTime, setHydrateTime] = React.useState(0);
 
     const handleHydrate = (id: string) => {
       setHydrationStatus((prev) => ({ ...prev, [id]: true }));
     };
 
-    // Simulate Server-Side Rendering (SSR) by generating HTML first,
-    // and counting how long the client takes to load the static version.
     const containerRef = React.useRef<HTMLDivElement>(null);
     React.useEffect(() => {
       if (containerRef.current) {
-        const startMount = performance.now();
-        
-        // Simulate SSR rendering
+        // 1. Generate SSR HTML
         (globalThis as any).__SSR__ = true;
         const ssrHtml = renderToString(
           <div style={{ display: "flex", flexWrap: "wrap", gap: "16px", justifyContent: "center" }}>
@@ -117,21 +111,35 @@ export const WithLazyHydration: StoryObj = {
         );
         delete (globalThis as any).__SSR__;
 
-        // Load static HTML (simulating client receiving SSR HTML)
+        // 2. Set the innerHTML to simulate SSR payload receiving
         containerRef.current.innerHTML = ssrHtml;
-        
-        // Measure end time
-        const endMount = performance.now();
-        setMountTime(endMount - startMount);
+
+        // 3. Hydrate and measure only the hydration call duration
+        const start = performance.now();
+        const root = hydrateRoot(
+          containerRef.current,
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "16px", justifyContent: "center" }}>
+            {componentIds.map((id) => (
+              <StaticHeavyButton
+                key={id}
+                id={id}
+                label="Interactive"
+                didHydrate={() => handleHydrate(id)}
+              />
+            ))}
+          </div>
+        );
+        const end = performance.now();
+        setHydrateTime(end - start);
+
+        return () => {
+          root.unmount();
+        };
       }
     }, []);
 
     const activeCount = Object.values(hydrationStatus).filter(Boolean).length;
     const staticCount = componentIds.length - activeCount;
-
-    // A normal render of 8 buttons would block for 8 * 50ms = 400ms.
-    // With lazy hydration, it mounts in < 5ms.
-    const timeSaved = Math.max(0, 400 - mountTime);
 
     return (
       <div style={containerStyle}>
@@ -140,22 +148,21 @@ export const WithLazyHydration: StoryObj = {
           <h1 style={titleStyle}>Story 1: Lazy Hydration (With useStatic)</h1>
           <p style={descStyle}>
             8 extremely heavy buttons are rendered. Since we use <code>useStatic</code>, they are not 
-            hydrated on initial client-side load. They load instantly as static HTML. Hover or focus 
-            on any button to hydrate it individually.
+            hydrated on initial client-side load. Hover or focus on any button to hydrate it.
           </p>
         </div>
 
         {/* Dashboard statistics */}
         <div style={dashboardStyle}>
           <div style={cardStyle}>
-            <div style={cardLabelStyle}>Initial Mount Blocking Time</div>
-            <div style={cardValueStyle("#10b981")}>{mountTime.toFixed(1)} ms</div>
-            <div style={cardSubStyle}>Instant load, 0ms JS block time</div>
+            <div style={cardLabelStyle}>Client Hydration Time</div>
+            <div style={cardValueStyle("#10b981")}>{hydrateTime.toFixed(1)} ms</div>
+            <div style={cardSubStyle}>Almost instantaneous client hydration</div>
           </div>
           <div style={cardStyle}>
-            <div style={cardLabelStyle}>Approx. Time Saved</div>
-            <div style={cardValueStyle("#3b82f6")}>~{timeSaved.toFixed(0)} ms</div>
-            <div style={cardSubStyle}>Main thread is kept free for user</div>
+            <div style={cardLabelStyle}>Time Saved on Load</div>
+            <div style={cardValueStyle("#3b82f6")}>~{(400 - hydrateTime).toFixed(0)} ms</div>
+            <div style={cardSubStyle}>Deferred heavy render work</div>
           </div>
           <div style={cardStyle}>
             <div style={cardLabelStyle}>Status (Active vs Static)</div>
@@ -176,9 +183,6 @@ export const WithLazyHydration: StoryObj = {
             borderRadius: "16px",
             border: "1px solid #334155",
             minHeight: "150px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
           }}
         />
 
@@ -196,15 +200,40 @@ export const WithoutLazyHydration: StoryObj = {
   name: "2. Without Lazy Hydration (Standard React)",
   render: () => {
     const componentIds = Array.from({ length: 8 }, (_, i) => `Button ${i + 1}`);
-    const [mountTime, setMountTime] = React.useState(0);
-    const [isMounted, setIsMounted] = React.useState(false);
+    const [hydrateTime, setHydrateTime] = React.useState(0);
 
-    // Measure the exact time taken to mount the heavy components
+    const containerRef = React.useRef<HTMLDivElement>(null);
     React.useEffect(() => {
-      const startMount = performance.now();
-      setIsMounted(true);
-      const endMount = performance.now();
-      setMountTime(endMount - startMount);
+      if (containerRef.current) {
+        // 1. Generate SSR HTML (standard rendering)
+        const ssrHtml = renderToString(
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "16px", justifyContent: "center" }}>
+            {componentIds.map((id) => (
+              <HeavyButtonComponent key={id} id={id} label="Immediate" />
+            ))}
+          </div>
+        );
+
+        // 2. Set the innerHTML
+        containerRef.current.innerHTML = ssrHtml;
+
+        // 3. Hydrate immediately and measure the blocking duration
+        const start = performance.now();
+        const root = hydrateRoot(
+          containerRef.current,
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "16px", justifyContent: "center" }}>
+            {componentIds.map((id) => (
+              <HeavyButtonComponent key={id} id={id} label="Immediate" />
+            ))}
+          </div>
+        );
+        const end = performance.now();
+        setHydrateTime(end - start);
+
+        return () => {
+          root.unmount();
+        };
+      }
     }, []);
 
     return (
@@ -214,21 +243,19 @@ export const WithoutLazyHydration: StoryObj = {
           <h1 style={titleStyle}>Story 2: Standard Hydration (No Hook)</h1>
           <p style={descStyle}>
             8 heavy buttons are rendered. Without lazy hydration, the client immediately hydrates all of them, 
-            blocking the main thread for <strong>~400ms</strong> during page load. The page feels frozen during this time.
+            blocking the main thread during page load.
           </p>
         </div>
 
         {/* Dashboard statistics */}
         <div style={dashboardStyle}>
           <div style={cardStyle}>
-            <div style={cardLabelStyle}>Initial Mount Blocking Time</div>
-            <div style={cardValueStyle("#ef4444")}>
-              {isMounted ? `${(mountTime || 400).toFixed(1)} ms` : "Measuring..."}
-            </div>
-            <div style={cardSubStyle}>Main thread is blocked on load</div>
+            <div style={cardLabelStyle}>Client Hydration Time</div>
+            <div style={cardValueStyle("#ef4444")}>{hydrateTime.toFixed(1)} ms</div>
+            <div style={cardSubStyle}>Blocks the main thread on page load</div>
           </div>
           <div style={cardStyle}>
-            <div style={cardLabelStyle}>Approx. Time Saved</div>
+            <div style={cardLabelStyle}>Time Saved on Load</div>
             <div style={cardValueStyle("#94a3b8")}>0 ms</div>
             <div style={cardSubStyle}>No performance optimization applied</div>
           </div>
@@ -244,26 +271,19 @@ export const WithoutLazyHydration: StoryObj = {
 
         {/* Render container */}
         <div
+          ref={containerRef}
           style={{
             background: "#1e293b",
             padding: "40px",
             borderRadius: "16px",
             border: "1px solid #334155",
-            display: "flex",
-            flexWrap: "wrap",
-            gap: "16px",
-            justifyContent: "center",
+            minHeight: "150px",
           }}
-        >
-          {isMounted &&
-            componentIds.map((id) => (
-              <HeavyButtonComponent key={id} id={id} label="Immediate" simulatedHydrated={true} />
-            ))}
-        </div>
+        />
 
         <div style={alertStyle}>
-          ⚠️ <strong>Notice:</strong> All buttons are already <strong>Active (Green)</strong> from the start. 
-          The loading latency is proportional to the number of heavy components on the page.
+          ⚠️ <strong>Notice:</strong> All buttons are already <strong>Active (Green)</strong> and interactive. 
+          The loading latency blocks the browser.
         </div>
       </div>
     );
