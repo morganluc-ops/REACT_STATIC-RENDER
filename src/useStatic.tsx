@@ -25,12 +25,15 @@ export function LazyHydrate({
 }: LazyHydrationOptions & { children: React.ReactNode }) {
   const childRef = React.useRef<HTMLElement>(null);
 
+  // Evaluate isServer dynamically during render to support testing environments
+  const isServer =
+    typeof window === "undefined" ||
+    (typeof global !== "undefined" && (global as any).__SSR__);
+
   // Initialize hydration state:
   // - On the server: always true so that the children are fully rendered to HTML.
   // - On the client: false initially to delay hydration.
-  const [hydrated, setHydrated] = React.useState(
-    () => typeof window === "undefined"
-  );
+  const [hydrated, setHydrated] = React.useState(isServer);
 
   // If the wrapper has no children on client-side mount, it means the server
   // did not render any HTML or it was empty. In this case, hydrate immediately.
