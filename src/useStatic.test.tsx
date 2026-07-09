@@ -58,8 +58,6 @@ describe("useStatic lazy hydration hook", () => {
     // Verify SSR output contains the button and the initial state text
     expect(html).toContain("Click Me");
     expect(html).toContain(" (Static)");
-    // The wrapper should have display: contents by default
-    expect(html).toContain('style="display:contents"');
   });
 
   test("should defer client-side hydration until interaction occurs", async () => {

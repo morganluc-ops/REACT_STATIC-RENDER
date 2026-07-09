@@ -11,8 +11,9 @@ const HeavyButtonComponent = React.forwardRef<
     id: string;
     label: string;
     onClick?: () => void;
+    onMountComplete?: () => void;
   }
->(({ id, label, onClick }, ref) => {
+>(({ id, label, onClick, onMountComplete }, ref) => {
   // Block the main thread for 50ms per button during render to simulate heavy components.
   const start = performance.now();
   while (performance.now() - start < 50) {
@@ -25,6 +26,9 @@ const HeavyButtonComponent = React.forwardRef<
 
   React.useEffect(() => {
     setIsHydrated(true);
+    if (onMountComplete) {
+      onMountComplete();
+    }
   }, []);
 
   const handleClick = (e: React.MouseEvent) => {
@@ -93,6 +97,8 @@ export const WithLazyHydration: StoryObj = {
     };
 
     const containerRef = React.useRef<HTMLDivElement>(null);
+    const startMountTimeRef = React.useRef(0);
+
     React.useEffect(() => {
       if (containerRef.current) {
         // 1. Generate SSR HTML
@@ -114,8 +120,8 @@ export const WithLazyHydration: StoryObj = {
         // 2. Set the innerHTML to simulate SSR payload receiving
         containerRef.current.innerHTML = ssrHtml;
 
-        // 3. Hydrate and measure only the hydration call duration
-        const start = performance.now();
+        // 3. Hydrate
+        startMountTimeRef.current = performance.now();
         const root = hydrateRoot(
           containerRef.current,
           <div style={{ display: "flex", flexWrap: "wrap", gap: "16px", justifyContent: "center" }}>
@@ -129,8 +135,9 @@ export const WithLazyHydration: StoryObj = {
             ))}
           </div>
         );
-        const end = performance.now();
-        setHydrateTime(end - start);
+
+        // Since no heavy components mount initially, hydration completes instantly
+        setHydrateTime(performance.now() - startMountTimeRef.current);
 
         return () => {
           root.unmount();
@@ -155,9 +162,9 @@ export const WithLazyHydration: StoryObj = {
         {/* Dashboard statistics */}
         <div style={dashboardStyle}>
           <div style={cardStyle}>
-            <div style={cardLabelStyle}>Client Hydration Time</div>
+            <div style={cardLabelStyle}>Initial Mount / Hydrate Time</div>
             <div style={cardValueStyle("#10b981")}>{hydrateTime.toFixed(1)} ms</div>
-            <div style={cardSubStyle}>Almost instantaneous client hydration</div>
+            <div style={cardSubStyle}>Almost instantaneous load time</div>
           </div>
           <div style={cardStyle}>
             <div style={cardLabelStyle}>Time Saved on Load</div>
@@ -203,6 +210,18 @@ export const WithoutLazyHydration: StoryObj = {
     const [hydrateTime, setHydrateTime] = React.useState(0);
 
     const containerRef = React.useRef<HTMLDivElement>(null);
+    const startMountTimeRef = React.useRef(0);
+    const mountedCountRef = React.useRef(0);
+
+    const handleMountComplete = () => {
+      mountedCountRef.current += 1;
+      if (mountedCountRef.current === componentIds.length) {
+        // All heavy buttons have finished mounting on the client
+        const end = performance.now();
+        setHydrateTime(end - startMountTimeRef.current);
+      }
+    };
+
     React.useEffect(() => {
       if (containerRef.current) {
         // 1. Generate SSR HTML (standard rendering)
@@ -217,18 +236,21 @@ export const WithoutLazyHydration: StoryObj = {
         // 2. Set the innerHTML
         containerRef.current.innerHTML = ssrHtml;
 
-        // 3. Hydrate immediately and measure the blocking duration
-        const start = performance.now();
+        // 3. Hydrate immediately and measure the full mount completion duration
+        startMountTimeRef.current = performance.now();
         const root = hydrateRoot(
           containerRef.current,
           <div style={{ display: "flex", flexWrap: "wrap", gap: "16px", justifyContent: "center" }}>
             {componentIds.map((id) => (
-              <HeavyButtonComponent key={id} id={id} label="Immediate" />
+              <HeavyButtonComponent
+                key={id}
+                id={id}
+                label="Immediate"
+                onMountComplete={handleMountComplete}
+              />
             ))}
           </div>
         );
-        const end = performance.now();
-        setHydrateTime(end - start);
 
         return () => {
           root.unmount();
@@ -250,8 +272,10 @@ export const WithoutLazyHydration: StoryObj = {
         {/* Dashboard statistics */}
         <div style={dashboardStyle}>
           <div style={cardStyle}>
-            <div style={cardLabelStyle}>Client Hydration Time</div>
-            <div style={cardValueStyle("#ef4444")}>{hydrateTime.toFixed(1)} ms</div>
+            <div style={cardLabelStyle}>Initial Mount / Hydrate Time</div>
+            <div style={cardValueStyle("#ef4444")}>
+              {hydrateTime > 0 ? `${hydrateTime.toFixed(1)} ms` : "Calculating..."}
+            </div>
             <div style={cardSubStyle}>Blocks the main thread on page load</div>
           </div>
           <div style={cardStyle}>

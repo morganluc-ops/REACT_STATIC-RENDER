@@ -18,7 +18,7 @@ const useIsomorphicLayoutEffect =
 export function LazyHydrate({
   children,
   ssrOnly = false,
-  on = ["pointerover", "focusin", "keydown"],
+  on = ["pointerover", "pointerdown", "focusin", "keydown", "click"],
   noWrapper = false,
   didHydrate,
   wrapperProps,
@@ -97,7 +97,6 @@ export function LazyHydrate({
     return (
       <WrapperElement
         ref={childRef}
-        style={{ display: "contents" }}
         {...wrapperProps}
       >
         {children}

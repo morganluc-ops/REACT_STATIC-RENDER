@@ -13,8 +13,8 @@ export interface LazyHydrationOptions {
 
   /**
    * List of DOM events on the wrapper element that will trigger hydration.
-   * e.g., 'pointerover', 'focusin', 'keydown' etc.
-   * @default ['pointerover', 'focusin', 'keydown']
+   * e.g., 'pointerover', 'pointerdown', 'focusin', 'keydown' etc.
+   * @default ['pointerover', 'pointerdown', 'focusin', 'keydown', 'click']
    */
   on?: (keyof HTMLElementEventMap)[] | keyof HTMLElementEventMap;
 
