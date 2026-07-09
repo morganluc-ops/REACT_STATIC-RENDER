@@ -28,7 +28,7 @@ export function LazyHydrate({
   // Evaluate isServer dynamically during render to support testing environments
   const isServer =
     typeof window === "undefined" ||
-    (typeof global !== "undefined" && (global as any).__SSR__);
+    (typeof globalThis !== "undefined" && (globalThis as any).__SSR__);
 
   // Initialize hydration state:
   // - On the server: always true so that the children are fully rendered to HTML.
@@ -43,9 +43,11 @@ export function LazyHydrate({
     }
   }, []);
 
-  // Fire callback after hydration completes
+  // Fire callback exactly once after hydration completes
+  const didHydrateRef = React.useRef(false);
   React.useEffect(() => {
-    if (hydrated && didHydrate) {
+    if (hydrated && didHydrate && !didHydrateRef.current) {
+      didHydrateRef.current = true;
       didHydrate();
     }
   }, [hydrated, didHydrate]);
