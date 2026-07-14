@@ -18,19 +18,22 @@ const useIsomorphicLayoutEffect =
 export function LazyHydrate({
   children,
   ssrOnly = false,
-  on = ["pointerover", "focusin", "keydown"],
+  on = ["pointerover", "pointerdown", "focusin", "keydown", "click"],
   noWrapper = false,
   didHydrate,
   wrapperProps,
 }: LazyHydrationOptions & { children: React.ReactNode }) {
   const childRef = React.useRef<HTMLElement>(null);
 
+  // Evaluate isServer dynamically during render to support testing environments
+  const isServer =
+    typeof window === "undefined" ||
+    (typeof globalThis !== "undefined" && (globalThis as unknown as { __SSR__?: boolean }).__SSR__);
+
   // Initialize hydration state:
   // - On the server: always true so that the children are fully rendered to HTML.
   // - On the client: false initially to delay hydration.
-  const [hydrated, setHydrated] = React.useState(
-    () => typeof window === "undefined"
-  );
+  const [hydrated, setHydrated] = React.useState(isServer);
 
   // If the wrapper has no children on client-side mount, it means the server
   // did not render any HTML or it was empty. In this case, hydrate immediately.
@@ -40,9 +43,11 @@ export function LazyHydrate({
     }
   }, []);
 
-  // Fire callback after hydration completes
+  // Fire callback exactly once after hydration completes
+  const didHydrateRef = React.useRef(false);
   React.useEffect(() => {
-    if (hydrated && didHydrate) {
+    if (hydrated && didHydrate && !didHydrateRef.current) {
+      didHydrateRef.current = true;
       didHydrate();
     }
   }, [hydrated, didHydrate]);
@@ -92,7 +97,6 @@ export function LazyHydrate({
     return (
       <WrapperElement
         ref={childRef}
-        style={{ display: "contents" }}
         {...wrapperProps}
       >
         {children}
