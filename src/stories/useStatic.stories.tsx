@@ -2,9 +2,8 @@ import * as React from "react";
 import type { Meta, StoryObj } from "@storybook/react";
 import { renderToString } from "react-dom/server";
 import { hydrateRoot } from "react-dom/client";
-import { useStatic } from "./useStatic";
+import { useStatic } from "../useStatic";
 
-// A component that simulates a very heavy rendering task
 const HeavyButtonComponent = React.forwardRef<
   HTMLButtonElement,
   {
@@ -14,13 +13,12 @@ const HeavyButtonComponent = React.forwardRef<
     onMountComplete?: () => void;
   }
 >(({ id, label, onClick, onMountComplete }, ref) => {
-  // Block the main thread for 50ms per button during render to simulate heavy components.
+
   const start = performance.now();
   while (performance.now() - start < 50) {
-    // Thread blocking loop
+
   }
 
-  // Track state for clicks
   const [clicks, setClicks] = React.useState(0);
   const [isHydrated, setIsHydrated] = React.useState(false);
 
@@ -82,7 +80,6 @@ const meta: Meta = {
 
 export default meta;
 
-// STORY 1: WITH USESTATIC (LAZY HYDRATION)
 export const WithLazyHydration: StoryObj = {
   name: "1. With Lazy Hydration (useStatic)",
   render: () => {
@@ -101,8 +98,8 @@ export const WithLazyHydration: StoryObj = {
 
     React.useEffect(() => {
       if (containerRef.current) {
-        // 1. Generate SSR HTML
-        (globalThis as any).__SSR__ = true;
+
+        (globalThis as unknown as { __SSR__?: boolean }).__SSR__ = true;
         const ssrHtml = renderToString(
           <div style={{ display: "flex", flexWrap: "wrap", gap: "16px", justifyContent: "center" }}>
             {componentIds.map((id) => (
@@ -115,12 +112,10 @@ export const WithLazyHydration: StoryObj = {
             ))}
           </div>
         );
-        delete (globalThis as any).__SSR__;
+        delete (globalThis as unknown as { __SSR__?: boolean }).__SSR__;
 
-        // 2. Set the innerHTML to simulate SSR payload receiving
         containerRef.current.innerHTML = ssrHtml;
 
-        // 3. Hydrate
         startMountTimeRef.current = performance.now();
         const root = hydrateRoot(
           containerRef.current,
@@ -136,7 +131,6 @@ export const WithLazyHydration: StoryObj = {
           </div>
         );
 
-        // Since no heavy components mount initially, hydration completes instantly
         setHydrateTime(performance.now() - startMountTimeRef.current);
 
         return () => {
@@ -202,7 +196,6 @@ export const WithLazyHydration: StoryObj = {
   },
 };
 
-// STORY 2: WITHOUT USESTATIC (NORMAL INSTANT HYDRATION)
 export const WithoutLazyHydration: StoryObj = {
   name: "2. Without Lazy Hydration (Standard React)",
   render: () => {
@@ -216,7 +209,7 @@ export const WithoutLazyHydration: StoryObj = {
     const handleMountComplete = () => {
       mountedCountRef.current += 1;
       if (mountedCountRef.current === componentIds.length) {
-        // All heavy buttons have finished mounting on the client
+
         const end = performance.now();
         setHydrateTime(end - startMountTimeRef.current);
       }
@@ -224,7 +217,7 @@ export const WithoutLazyHydration: StoryObj = {
 
     React.useEffect(() => {
       if (containerRef.current) {
-        // 1. Generate SSR HTML (standard rendering)
+
         const ssrHtml = renderToString(
           <div style={{ display: "flex", flexWrap: "wrap", gap: "16px", justifyContent: "center" }}>
             {componentIds.map((id) => (
@@ -233,10 +226,8 @@ export const WithoutLazyHydration: StoryObj = {
           </div>
         );
 
-        // 2. Set the innerHTML
         containerRef.current.innerHTML = ssrHtml;
 
-        // 3. Hydrate immediately and measure the full mount completion duration
         startMountTimeRef.current = performance.now();
         const root = hydrateRoot(
           containerRef.current,
@@ -314,7 +305,6 @@ export const WithoutLazyHydration: StoryObj = {
   },
 };
 
-// Styling variables
 const containerStyle: React.CSSProperties = {
   background: "#0f172a",
   minHeight: "100vh",

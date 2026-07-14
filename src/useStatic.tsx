@@ -28,7 +28,7 @@ export function LazyHydrate({
   // Evaluate isServer dynamically during render to support testing environments
   const isServer =
     typeof window === "undefined" ||
-    (typeof globalThis !== "undefined" && (globalThis as any).__SSR__);
+    (typeof globalThis !== "undefined" && (globalThis as unknown as { __SSR__?: boolean }).__SSR__);
 
   // Initialize hydration state:
   // - On the server: always true so that the children are fully rendered to HTML.

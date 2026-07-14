@@ -3,9 +3,9 @@ import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderToString } from "react-dom/server";
 import { hydrateRoot } from "react-dom/client";
 import { act } from "@testing-library/react";
-import { useStatic } from "./useStatic";
+import { axe } from "jest-axe";
+import { useStatic } from "../useStatic";
 
-// A simple interactive counter button to test hydration and effect lifecycle
 const TestButton = React.forwardRef<
   HTMLButtonElement,
   { onClick?: () => void; children: React.ReactNode }
@@ -26,13 +26,12 @@ const TestButton = React.forwardRef<
 
 TestButton.displayName = "TestButton";
 
-// Helper to simulate server environment during renderToString in jsdom tests
 function ssrRender(element: React.ReactElement): string {
-  (global as any).__SSR__ = true;
+  (globalThis as unknown as { __SSR__?: boolean }).__SSR__ = true;
   try {
     return renderToString(element);
   } finally {
-    delete (global as any).__SSR__;
+    delete (globalThis as unknown as { __SSR__?: boolean }).__SSR__;
   }
 }
 
@@ -55,7 +54,6 @@ describe("useStatic lazy hydration hook", () => {
       <StaticButton onClick={() => {}}>Click Me</StaticButton>
     );
 
-    // Verify SSR output contains the button and the initial state text
     expect(html).toContain("Click Me");
     expect(html).toContain(" (Static)");
   });
@@ -64,18 +62,15 @@ describe("useStatic lazy hydration hook", () => {
     const handleClick = vi.fn();
     const StaticButton = useStatic(TestButton);
 
-    // 1. Generate SSR HTML
     const html = ssrRender(
       <StaticButton onClick={handleClick}>Click Me</StaticButton>
     );
     container.innerHTML = html;
 
-    // Verify initial state in DOM
     const button = container.querySelector("button");
     expect(button).not.toBeNull();
     expect(button?.textContent).toBe("Click Me (Static)");
 
-    // 2. Perform client-side hydration
     await act(async () => {
       hydrateRoot(
         container,
@@ -83,21 +78,17 @@ describe("useStatic lazy hydration hook", () => {
       );
     });
 
-    // Verify that child component is still NOT hydrated (useEffect not run, onClick not active)
     expect(button?.textContent).toBe("Click Me (Static)");
     button?.click();
     expect(handleClick).not.toHaveBeenCalled();
 
-    // 3. Trigger hover (pointerover) to force hydration
     await act(async () => {
       button?.dispatchEvent(new MouseEvent("pointerover", { bubbles: true }));
     });
 
-    // Re-query the button from the container as React replaces the static DOM nodes
     const hydratedButton = container.querySelector("button");
     expect(hydratedButton?.textContent).toBe("Click Me (Active)");
 
-    // Verify that clicks now work normally
     hydratedButton?.click();
     expect(handleClick).toHaveBeenCalledTimes(1);
   });
@@ -120,12 +111,10 @@ describe("useStatic lazy hydration hook", () => {
 
     expect(button?.textContent).toBe("Focus Me (Static)");
 
-    // Trigger focusin event
     await act(async () => {
       button?.dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
     });
 
-    // Re-query the button from the container after hydration
     const hydratedButton = container.querySelector("button");
     expect(hydratedButton?.textContent).toBe("Focus Me (Active)");
   });
@@ -148,14 +137,12 @@ describe("useStatic lazy hydration hook", () => {
 
     expect(button?.textContent).toBe("Press Me (Static)");
 
-    // Trigger keydown event
     await act(async () => {
       button?.dispatchEvent(
         new KeyboardEvent("keydown", { bubbles: true, key: "Enter" })
       );
     });
 
-    // Re-query the button from the container after hydration
     const hydratedButton = container.querySelector("button");
     expect(hydratedButton?.textContent).toBe("Press Me (Active)");
   });
@@ -184,14 +171,12 @@ describe("useStatic lazy hydration hook", () => {
 
     expect(button?.textContent).toBe("Static Only (Static)");
 
-    // Attempt interactions
     await act(async () => {
       button?.dispatchEvent(new MouseEvent("pointerover", { bubbles: true }));
       button?.dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
       button?.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true }));
     });
 
-    // Content should remain static and clicks should not work
     expect(button?.textContent).toBe("Static Only (Static)");
     button?.click();
     expect(handleClick).not.toHaveBeenCalled();
@@ -203,8 +188,18 @@ describe("useStatic lazy hydration hook", () => {
       <StaticButton noWrapper="span">Span Wrapper</StaticButton>
     );
 
-    // Verify it renders a span tag instead of a div
     expect(html).toContain("<span");
     expect(html).not.toContain("<div");
+  });
+
+  test("should not have any accessibility violations", async () => {
+    const StaticButton = useStatic(TestButton);
+    const html = ssrRender(
+      <StaticButton onClick={() => {}}>Accessible Button</StaticButton>
+    );
+    container.innerHTML = html;
+
+    const results = await axe(container);
+    expect(results).toHaveNoViolations();
   });
 });
