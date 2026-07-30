@@ -1,19 +1,31 @@
 import * as React from "react";
 import type { LazyHydrationOptions } from "./types";
 
-// React throws layout effect warnings during Server-Side Rendering (SSR).
-// We use useIsomorphicLayoutEffect to safely run layout effect on client and normal effect on server.
-const useIsomorphicLayoutEffect =
-  typeof window !== "undefined" ? React.useLayoutEffect : React.useEffect;
+const EMPTY_HTML = { __html: "" };
+
+interface SafeStaticHTMLProps {
+  wrapper: React.ElementType;
+  childRef: React.RefObject<HTMLElement>;
+  wrapperProps?: React.HTMLProps<HTMLElement>;
+}
+
+const SafeStaticHTML = React.memo(
+  ({ wrapper: Wrapper, childRef, wrapperProps }: SafeStaticHTMLProps) => {
+    return (
+      <Wrapper
+        ref={childRef}
+        suppressHydrationWarning
+        dangerouslySetInnerHTML={EMPTY_HTML}
+        {...wrapperProps}
+      />
+    );
+  },
+  () => true
+);
 
 /**
  * LazyHydrate is a wrapper component that defers the hydration of its children
  * until a specific interaction (hover, focus, keyboard) occurs.
- *
- * It works by rendering an empty element with `dangerouslySetInnerHTML={{ __html: "" }}`
- * on the client during initial hydration, which forces React to bypass reconciling
- * the server-rendered HTML inside this DOM node. Once an interaction occurs,
- * it switches to rendering the active React children.
  */
 export function LazyHydrate({
   children,
@@ -28,16 +40,17 @@ export function LazyHydrate({
   // Evaluate isServer dynamically during render to support testing environments
   const isServer =
     typeof window === "undefined" ||
-    (typeof globalThis !== "undefined" && (globalThis as unknown as { __SSR__?: boolean }).__SSR__);
+    (typeof globalThis !== "undefined" && Boolean((globalThis as any).__SSR__));
 
   // Initialize hydration state:
-  // - On the server: always true so that the children are fully rendered to HTML.
-  // - On the client: false initially to delay hydration.
   const [hydrated, setHydrated] = React.useState(isServer);
+
+  // Safely use layout effect on client, normal effect on server (prevents SSR warnings)
+  const useIsomorphicEffect = isServer ? React.useEffect : React.useLayoutEffect;
 
   // If the wrapper has no children on client-side mount, it means the server
   // did not render any HTML or it was empty. In this case, hydrate immediately.
-  useIsomorphicLayoutEffect(() => {
+  useIsomorphicEffect(() => {
     if (childRef.current && !childRef.current.hasChildNodes()) {
       setHydrated(true);
     }
@@ -105,14 +118,13 @@ export function LazyHydrate({
   }
 
   // Pre-hydration state:
-  // Render the wrapper element with an empty innerHTML to prevent React from
-  // reconciling (and thus hydrating) the server-generated HTML inside it.
+  // Render a memoized static wrapper that never updates to prevent React from
+  // reconciling (and thus clearing) the server-generated HTML inside it.
   return (
-    <WrapperElement
-      ref={childRef}
-      suppressHydrationWarning
-      dangerouslySetInnerHTML={{ __html: "" }}
-      {...wrapperProps}
+    <SafeStaticHTML
+      wrapper={WrapperElement}
+      childRef={childRef}
+      wrapperProps={wrapperProps}
     />
   );
 }
@@ -136,7 +148,7 @@ export function useStatic<P extends object>(
   Component: React.ComponentType<P>,
   defaultOptions: LazyHydrationOptions = {}
 ): React.ComponentType<P & LazyHydrationOptions> {
-  const WrappedComponent = React.forwardRef<any, P & LazyHydrationOptions>(
+  const WrappedComponent = React.forwardRef<HTMLElement, P & LazyHydrationOptions>(
     (props, ref) => {
       const {
         ssrOnly = defaultOptions.ssrOnly,
@@ -145,7 +157,7 @@ export function useStatic<P extends object>(
         didHydrate = defaultOptions.didHydrate,
         wrapperProps = defaultOptions.wrapperProps,
         ...restProps
-      } = props as any;
+      } = props;
 
       return (
         <LazyHydrate
