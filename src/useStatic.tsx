@@ -6,6 +6,22 @@ import type { LazyHydrationOptions } from "./types";
 const useIsomorphicLayoutEffect =
   typeof window !== "undefined" ? React.useLayoutEffect : React.useEffect;
 
+const EMPTY_HTML = { __html: "" };
+
+const SafeStaticHTML = React.memo(
+  ({ wrapper: Wrapper, childRef, wrapperProps }: any) => {
+    return (
+      <Wrapper
+        ref={childRef}
+        suppressHydrationWarning
+        dangerouslySetInnerHTML={EMPTY_HTML}
+        {...wrapperProps}
+      />
+    );
+  },
+  () => true
+);
+
 /**
  * LazyHydrate is a wrapper component that defers the hydration of its children
  * until a specific interaction (hover, focus, keyboard) occurs.
@@ -105,14 +121,13 @@ export function LazyHydrate({
   }
 
   // Pre-hydration state:
-  // Render the wrapper element with an empty innerHTML to prevent React from
-  // reconciling (and thus hydrating) the server-generated HTML inside it.
+  // Render a memoized static wrapper that never updates to prevent React from
+  // reconciling (and thus clearing) the server-generated HTML inside it.
   return (
-    <WrapperElement
-      ref={childRef}
-      suppressHydrationWarning
-      dangerouslySetInnerHTML={{ __html: "" }}
-      {...wrapperProps}
+    <SafeStaticHTML
+      wrapper={WrapperElement}
+      childRef={childRef}
+      wrapperProps={wrapperProps}
     />
   );
 }
