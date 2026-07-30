@@ -79,7 +79,9 @@ describe("useStatic lazy hydration hook", () => {
     });
 
     expect(button?.textContent).toBe("Click Me (Static)");
-    button?.click();
+    await act(async () => {
+      button?.click();
+    });
     expect(handleClick).not.toHaveBeenCalled();
 
     await act(async () => {
@@ -89,7 +91,9 @@ describe("useStatic lazy hydration hook", () => {
     const hydratedButton = container.querySelector("button");
     expect(hydratedButton?.textContent).toBe("Click Me (Active)");
 
-    hydratedButton?.click();
+    await act(async () => {
+      hydratedButton?.click();
+    });
     expect(handleClick).toHaveBeenCalledTimes(1);
   });
 
@@ -178,7 +182,9 @@ describe("useStatic lazy hydration hook", () => {
     });
 
     expect(button?.textContent).toBe("Static Only (Static)");
-    button?.click();
+    await act(async () => {
+      button?.click();
+    });
     expect(handleClick).not.toHaveBeenCalled();
   });
 
