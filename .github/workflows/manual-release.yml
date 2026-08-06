@@ -1,7 +1,17 @@
-name: "Release to NPM"
+name: "Manual Release"
 
 on:
   workflow_dispatch:
+    inputs:
+      release_type:
+        description: "Release type (patch, minor, major)"
+        required: true
+        default: "patch"
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
 
 jobs:
   publish:
@@ -36,8 +46,8 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Bump patch version
-        run: npm version patch -m "chore(release): %s"
+      - name: Bump version
+        run: 'npm version ${{ inputs.release_type }} -m "chore(release): %s"'
 
       - name: Push tags
         run: git push origin main --tags
