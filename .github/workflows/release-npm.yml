@@ -1,18 +1,10 @@
 name: "Release to NPM"
 
 on:
-  push:
-    branches: [ "main" ]
   workflow_dispatch:
-    inputs:
-      release_type:
-        description: "Release type (patch, minor, major)"
-        required: true
-        default: "patch"
 
 jobs:
   publish:
-    if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
 
     permissions:
@@ -44,8 +36,8 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Bump version
-        run: npm version ${{ github.event.inputs.release_type }} -m "chore(release): %s"
+      - name: Bump patch version
+        run: npm version patch -m "chore(release): %s"
 
       - name: Push tags
         run: git push origin main --tags
