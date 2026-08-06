@@ -4,9 +4,10 @@ on:
   workflow_dispatch:
     inputs:
       release_type:
-        description: 'Release type (patch, minor, major)'
-        required: true
         type: choice
+        description: 'Release type'
+        required: true
+        default: 'patch'
         options:
           - patch
           - minor
@@ -17,15 +18,13 @@ jobs:
     runs-on: ubuntu-latest
 
     permissions:
-      contents: write # Needed to push commits and tags
+      contents: write
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Required for pushing tags
-          # Using a specific branch or just keeping it on main since we push to main
-          ref: main 
+          fetch-depth: 0
 
       - name: Setup Node.js v20
         uses: actions/setup-node@v4
@@ -36,7 +35,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run checks (Test, Type Check, Build)
+      - name: Run checks
         run: |
           npx tsc --noEmit
           npm test
@@ -47,10 +46,10 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Bump version & Tag
+      - name: Bump version
         run: npm version ${{ github.event.inputs.release_type }} -m "chore(release): %s"
 
-      - name: Push version bump and tags
+      - name: Push tags
         run: git push origin main --tags
 
       - name: Publish to NPM
