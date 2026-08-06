@@ -2,14 +2,14 @@ name: Release
 
 on:
   push:
-    paths:
-      - '.github/workflows/manual-release.yml'
+    branches: [ "main" ]
   workflow_dispatch:
     inputs:
       release_type:
-        type: choice
-        description: 'Release type'
+        description: 'Release type (patch, minor, major)'
+        required: true
         default: 'patch'
+        type: choice
         options:
           - patch
           - minor
@@ -17,6 +17,7 @@ on:
 
 jobs:
   publish:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
 
     permissions:
@@ -49,21 +50,17 @@ jobs:
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Bump version
-        if: ${{ github.event_name == 'workflow_dispatch' }}
         run: npm version ${{ inputs.release_type }} -m "chore(release): %s"
 
       - name: Push tags
-        if: ${{ github.event_name == 'workflow_dispatch' }}
         run: git push origin main --tags
 
       - name: Publish to NPM
-        if: ${{ github.event_name == 'workflow_dispatch' }}
         run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Create GitHub Release
-        if: ${{ github.event_name == 'workflow_dispatch' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
