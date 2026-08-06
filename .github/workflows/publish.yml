@@ -1,11 +1,11 @@
-name: Publish to NPM & Release
+name: "Publish to NPM and Release"
 
 on:
   workflow_dispatch:
     inputs:
       release_type:
         type: choice
-        description: 'Release type'
+        description: 'Release type (patch, minor, major)'
         required: true
         default: 'patch'
         options:
