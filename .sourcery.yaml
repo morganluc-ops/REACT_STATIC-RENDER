@@ -1,0 +1,15 @@
+# .sourcery.yaml
+
+ignore:
+  - "dist/**"
+  - "pnpm-lock.yaml"
+  - "tmp_test/**"
+  - "*.db"
+
+github:
+  show_summary: true
+  show_suggestions: true
+  request_review: on_pull_request
+  ignore_labels:
+    - "dependencies"
+    - "no-review"
