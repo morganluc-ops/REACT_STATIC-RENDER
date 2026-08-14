@@ -34,6 +34,7 @@ export function LazyHydrate({
   noWrapper = false,
   didHydrate,
   wrapperProps,
+  observerOptions,
 }: LazyHydrationOptions & { children: React.ReactNode }) {
   const childRef = React.useRef<HTMLElement>(null);
 
@@ -78,39 +79,65 @@ export function LazyHydrate({
       setHydrated(true);
     };
 
-    // Normalize event(s) to array
-    const eventTypes = Array.isArray(on) ? on : [on];
+    // Normalize event(s)/trigger(s) to array
+    const triggers = Array.isArray(on) ? on : [on];
 
-    // Attach event listeners. We use bubbling events (pointerover, focusin)
-    // because the user interacts with the child elements inside the wrapper.
-    eventTypes.forEach((eventType) => {
-      rootElement.addEventListener(eventType, triggerHydration, {
-        once: true,
-        passive: true,
-      });
-      cleanupFns.push(() => {
-        rootElement.removeEventListener(eventType, triggerHydration);
-      });
+    triggers.forEach((trigger) => {
+      if (trigger === "visible") {
+        if (typeof IntersectionObserver !== "undefined") {
+          const observer = new IntersectionObserver((entries) => {
+            entries.forEach((entry) => {
+              if (entry.isIntersecting) {
+                triggerHydration();
+              }
+            });
+          }, observerOptions);
+
+          observer.observe(rootElement);
+          cleanupFns.push(() => {
+            observer.disconnect();
+          });
+        }
+      } else {
+        rootElement.addEventListener(trigger, triggerHydration, {
+          once: true,
+          passive: true,
+        });
+        cleanupFns.push(() => {
+          rootElement.removeEventListener(trigger, triggerHydration);
+        });
+      }
     });
 
     return () => {
       cleanupFns.forEach((cleanup) => cleanup());
     };
-  }, [hydrated, on, ssrOnly]);
+  }, [hydrated, on, ssrOnly, observerOptions]);
 
   // Determine wrapper tag (defaults to "div")
   const WrapperElement = (typeof noWrapper === "string"
     ? noWrapper
     : "div") as React.ElementType;
 
-  if (hydrated) {
+  // Combine wrapperProps with display: contents when noWrapper is true
+  const computedWrapperProps = React.useMemo(() => {
     if (noWrapper === true) {
-      return <>{children}</>;
+      return {
+        ...wrapperProps,
+        style: {
+          display: "contents",
+          ...wrapperProps?.style,
+        },
+      };
     }
+    return wrapperProps;
+  }, [noWrapper, wrapperProps]);
+
+  if (hydrated) {
     return (
       <WrapperElement
         ref={childRef}
-        {...wrapperProps}
+        {...computedWrapperProps}
       >
         {children}
       </WrapperElement>
@@ -124,7 +151,7 @@ export function LazyHydrate({
     <SafeStaticHTML
       wrapper={WrapperElement}
       childRef={childRef}
-      wrapperProps={wrapperProps}
+      wrapperProps={computedWrapperProps}
     />
   );
 }
@@ -156,6 +183,7 @@ export function useStatic<P extends object>(
         noWrapper = defaultOptions.noWrapper,
         didHydrate = defaultOptions.didHydrate,
         wrapperProps = defaultOptions.wrapperProps,
+        observerOptions = defaultOptions.observerOptions,
         ...restProps
       } = props;
 
@@ -166,6 +194,7 @@ export function useStatic<P extends object>(
           noWrapper={noWrapper}
           didHydrate={didHydrate}
           wrapperProps={wrapperProps}
+          observerOptions={observerOptions}
         >
           <Component ref={ref} {...(restProps as P)} />
         </LazyHydrate>

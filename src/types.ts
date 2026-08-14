@@ -12,18 +12,26 @@ export interface LazyHydrationOptions {
   ssrOnly?: boolean;
 
   /**
-   * List of DOM events on the wrapper element that will trigger hydration.
-   * e.g., 'pointerover', 'pointerdown', 'focusin', 'keydown' etc.
+   * List of DOM events or special triggers (e.g., 'visible') on the wrapper element that will trigger hydration.
+   * Use 'visible' to hydrate when the element enters the viewport via IntersectionObserver.
+   * e.g., 'pointerover', 'pointerdown', 'focusin', 'keydown', 'click', 'visible'
    * @default ['pointerover', 'pointerdown', 'focusin', 'keydown', 'click']
    */
-  on?: (keyof HTMLElementEventMap)[] | keyof HTMLElementEventMap;
+  on?:
+    | (keyof HTMLElementEventMap | "visible")[]
+    | keyof HTMLElementEventMap
+    | "visible";
 
   /**
-   * By default, a wrapper `div` element with `display: contents` style is rendered
-   * to capture event listeners and reference the DOM node.
-   * If noWrapper is set to true (or a custom element tag string), it behaves as follows:
-   * - Before hydration, it MUST render the wrapper element to match the server HTML structure.
-   * - After hydration, it can replace it with direct children if `noWrapper` is true.
+   * Options passed to IntersectionObserver when 'visible' is used in `on`.
+   */
+  observerOptions?: IntersectionObserverInit;
+
+  /**
+   * Configures the HTML tag wrapper behavior.
+   * - `false`: Uses a default `div` wrapper element.
+   * - `true`: Uses a `div` wrapper with `display: contents` styling to avoid visual layout shifts while preserving DOM hierarchy before and after hydration.
+   * - `string`: Specifies a custom HTML tag (e.g., `'span'`, `'article'`).
    * @default false
    */
   noWrapper?: boolean | keyof JSX.IntrinsicElements;
