@@ -188,7 +188,7 @@ describe("useStatic lazy hydration hook", () => {
     expect(handleClick).not.toHaveBeenCalled();
   });
 
-  test("should support custom wrapper element", async () => {
+  test("should support custom wrapper element string tag", async () => {
     const StaticButton = useStatic(TestButton);
     const html = ssrRender(
       <StaticButton noWrapper="span">Span Wrapper</StaticButton>
@@ -196,6 +196,90 @@ describe("useStatic lazy hydration hook", () => {
 
     expect(html).toContain("<span");
     expect(html).not.toContain("<div");
+  });
+
+  test("should preserve wrapper with display: contents style when noWrapper is true both pre and post hydration", async () => {
+    const StaticButton = useStatic(TestButton);
+    const html = ssrRender(
+      <StaticButton noWrapper>No Wrapper Test</StaticButton>
+    );
+    container.innerHTML = html;
+
+    expect(html).toContain('style="display:contents"');
+
+    await act(async () => {
+      hydrateRoot(
+        container,
+        <StaticButton noWrapper>No Wrapper Test</StaticButton>
+      );
+    });
+
+    const wrapper = container.querySelector("div");
+    expect(wrapper).not.toBeNull();
+    expect(wrapper?.style.display).toBe("contents");
+
+    // Trigger hydration
+    await act(async () => {
+      wrapper?.dispatchEvent(new MouseEvent("pointerover", { bubbles: true }));
+    });
+
+    // Verify DOM structure continuity post hydration
+    const wrapperPostHydration = container.querySelector("div");
+    expect(wrapperPostHydration).not.toBeNull();
+    expect(wrapperPostHydration?.style.display).toBe("contents");
+    expect(wrapperPostHydration?.querySelector("button")?.textContent).toBe("No Wrapper Test (Active)");
+  });
+
+  test("should trigger hydration when 'visible' trigger is used with IntersectionObserver", async () => {
+    let observerCallback: IntersectionObserverCallback | null = null;
+    const observeMock = vi.fn();
+    const disconnectMock = vi.fn();
+
+    class MockIntersectionObserver implements IntersectionObserver {
+      readonly root: Element | Document | null = null;
+      readonly rootMargin: string = "";
+      readonly thresholds: ReadonlyArray<number> = [];
+      constructor(callback: IntersectionObserverCallback) {
+        observerCallback = callback;
+      }
+      observe = observeMock;
+      unobserve = vi.fn();
+      disconnect = disconnectMock;
+      takeRecords = vi.fn(() => []);
+    }
+
+    vi.stubGlobal("IntersectionObserver", MockIntersectionObserver);
+
+    const StaticButton = useStatic(TestButton);
+    const html = ssrRender(
+      <StaticButton on="visible">Visible Hydration Button</StaticButton>
+    );
+    container.innerHTML = html;
+
+    await act(async () => {
+      hydrateRoot(
+        container,
+        <StaticButton on="visible">Visible Hydration Button</StaticButton>
+      );
+    });
+
+    const button = container.querySelector("button");
+    expect(button?.textContent).toBe("Visible Hydration Button (Static)");
+    expect(observeMock).toHaveBeenCalledTimes(1);
+
+    // Simulate element scrolling into view
+    await act(async () => {
+      if (observerCallback) {
+        observerCallback(
+          [{ isIntersecting: true } as IntersectionObserverEntry],
+          {} as IntersectionObserver
+        );
+      }
+    });
+
+    const hydratedButton = container.querySelector("button");
+    expect(hydratedButton?.textContent).toBe("Visible Hydration Button (Active)");
+    expect(disconnectMock).toHaveBeenCalled();
   });
 
   test("should not have any accessibility violations", async () => {
