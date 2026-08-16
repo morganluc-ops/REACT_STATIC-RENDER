@@ -282,6 +282,68 @@ describe("useStatic lazy hydration hook", () => {
     expect(disconnectMock).toHaveBeenCalled();
   });
 
+  test("should forward observerOptions to IntersectionObserver and observe the wrapper element", async () => {
+    let capturedOptions: IntersectionObserverInit | undefined;
+    const observeMock = vi.fn();
+
+    class MockIntersectionObserver implements IntersectionObserver {
+      readonly root: Element | Document | null = null;
+      readonly rootMargin: string = "";
+      readonly thresholds: ReadonlyArray<number> = [];
+      constructor(_callback: IntersectionObserverCallback, options?: IntersectionObserverInit) {
+        capturedOptions = options;
+      }
+      observe = observeMock;
+      unobserve = vi.fn();
+      disconnect = vi.fn();
+      takeRecords = vi.fn(() => []);
+    }
+
+    vi.stubGlobal("IntersectionObserver", MockIntersectionObserver);
+
+    const StaticButton = useStatic(TestButton);
+    const observerOptions: IntersectionObserverInit = { rootMargin: "20px", threshold: 0.5 };
+    const html = ssrRender(
+      <StaticButton on="visible" observerOptions={observerOptions}>
+        Options Button
+      </StaticButton>
+    );
+    container.innerHTML = html;
+
+    await act(async () => {
+      hydrateRoot(
+        container,
+        <StaticButton on="visible" observerOptions={observerOptions}>
+          Options Button
+        </StaticButton>
+      );
+    });
+
+    expect(capturedOptions).toEqual(observerOptions);
+    expect(observeMock).toHaveBeenCalledTimes(1);
+    expect(observeMock.mock.calls[0][0].tagName.toLowerCase()).toBe("div");
+  });
+
+  test("should not crash when 'visible' trigger is used in environments without IntersectionObserver", async () => {
+    vi.stubGlobal("IntersectionObserver", undefined);
+
+    const StaticButton = useStatic(TestButton);
+    const html = ssrRender(
+      <StaticButton on="visible">No Observer Button</StaticButton>
+    );
+    container.innerHTML = html;
+
+    await act(async () => {
+      hydrateRoot(
+        container,
+        <StaticButton on="visible">No Observer Button</StaticButton>
+      );
+    });
+
+    const button = container.querySelector("button");
+    expect(button?.textContent).toBe("No Observer Button (Static)");
+  });
+
   test("should not have any accessibility violations", async () => {
     const StaticButton = useStatic(TestButton);
     const html = ssrRender(
