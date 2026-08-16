@@ -7,6 +7,12 @@ updates:
     labels:
       - "dependencies"
     open-pull-requests-limit: 5
+    groups:
+      react-ecosystem:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react*"
     commit-message:
       prefix: "chore(deps)"
 
