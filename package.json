@@ -43,7 +43,7 @@
     "@types/react-dom": "^18.2.0",
     "@vitejs/plugin-react": "^6.0.3",
     "jest-axe": "^10.0.0",
-    "jsdom": "^29.1.1",
+    "jsdom": "^30.0.1",
     "puppeteer": "^25.7.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
