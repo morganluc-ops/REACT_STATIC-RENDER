@@ -2,9 +2,9 @@ import * as React from "react";
 import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderToString } from "react-dom/server";
 import { hydrateRoot } from "react-dom/client";
-import { act } from "@testing-library/react";
+import { act, render } from "@testing-library/react";
 import { axe } from "jest-axe";
-import { useStatic } from "../useStatic";
+import { useStatic, LazyHydrate, SafeStaticHTML } from "../useStatic";
 
 const TestButton = React.forwardRef<
   HTMLButtonElement,
@@ -342,6 +342,21 @@ describe("useStatic lazy hydration hook", () => {
 
     const button = container.querySelector("button");
     expect(button?.textContent).toBe("No Observer Button (Static)");
+  });
+
+  test("should not allow wrapperProps to override dangerouslySetInnerHTML in SafeStaticHTML", () => {
+    const ref = React.createRef<HTMLElement>();
+    const wrapperProps = {
+      dangerouslySetInnerHTML: { __html: "<script>alert('xss')</script>" },
+    };
+
+    const element = (SafeStaticHTML.type as React.FC<any>)({
+      wrapper: "div",
+      childRef: ref,
+      wrapperProps,
+    }) as React.ReactElement;
+
+    expect(element.props.dangerouslySetInnerHTML).toEqual({ __html: "" });
   });
 
   test("should not have any accessibility violations", async () => {
