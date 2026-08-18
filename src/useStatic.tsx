@@ -9,14 +9,14 @@ interface SafeStaticHTMLProps {
   wrapperProps?: React.HTMLProps<HTMLElement>;
 }
 
-const SafeStaticHTML = React.memo(
+export const SafeStaticHTML = React.memo(
   ({ wrapper: Wrapper, childRef, wrapperProps }: SafeStaticHTMLProps) => {
     return (
       <Wrapper
+        {...wrapperProps}
         ref={childRef}
         suppressHydrationWarning
         dangerouslySetInnerHTML={EMPTY_HTML}
-        {...wrapperProps}
       />
     );
   },
