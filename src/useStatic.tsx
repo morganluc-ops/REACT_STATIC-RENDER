@@ -9,14 +9,14 @@ interface SafeStaticHTMLProps {
   wrapperProps?: React.HTMLProps<HTMLElement>;
 }
 
-const SafeStaticHTML = React.memo(
+export const SafeStaticHTML = React.memo(
   ({ wrapper: Wrapper, childRef, wrapperProps }: SafeStaticHTMLProps) => {
     return (
       <Wrapper
+        {...wrapperProps}
         ref={childRef}
         suppressHydrationWarning
         dangerouslySetInnerHTML={EMPTY_HTML}
-        {...wrapperProps}
       />
     );
   },
@@ -41,7 +41,8 @@ export function LazyHydrate({
   // Evaluate isServer dynamically during render to support testing environments
   const isServer =
     typeof window === "undefined" ||
-    (typeof globalThis !== "undefined" && Boolean((globalThis as any).__SSR__));
+    (typeof globalThis !== "undefined" &&
+      Boolean((globalThis as unknown as { __SSR__?: boolean }).__SSR__));
 
   // Initialize hydration state:
   const [hydrated, setHydrated] = React.useState(isServer);
