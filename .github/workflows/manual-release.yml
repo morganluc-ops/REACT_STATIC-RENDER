@@ -50,7 +50,9 @@ jobs:
         run: 'npm version ${{ inputs.release_type }} -m "chore(release): %s"'
 
       - name: Push tags
-        run: git push origin main --tags
+        run: |
+          git pull origin main --no-rebase
+          git push origin main --tags
 
       - name: Publish to NPM
         run: npm publish --access public
