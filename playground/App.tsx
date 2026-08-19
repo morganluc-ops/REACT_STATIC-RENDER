@@ -3,7 +3,6 @@
  * You can import your hooks and components here to play around with them locally.
  */
 import React from 'react';
-import { useStaticRender } from '../src/hooks/useStaticRender';
 
 export default function App() {
   return (

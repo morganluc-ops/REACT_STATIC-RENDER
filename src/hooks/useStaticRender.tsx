@@ -48,18 +48,17 @@ export const useStaticRender = <P extends object>(
   const { hydrationDelay = 30, displayContents = true } = options;
 
   const prototypeMarkup = useMemo(() => {
-    const props = baseElement.props;
-    const propsWithChildren = props as Record<string, unknown>;
+    const props = baseElement.props as P & { children?: React.ReactNode };
     const template = React.cloneElement(
       baseElement,
       props,
-      (propsWithChildren.children as React.ReactNode) || SLOT_MARKER,
+      props.children || SLOT_MARKER,
     );
     return renderToStaticMarkup(template);
   }, [baseElement]);
 
   const StaticItem = useMemo(() => {
-    return ({ children, ...componentProps }: StaticItemProps<P>) => {
+    const Component = ({ children, ...componentProps }: StaticItemProps<P>) => {
       const [isInteractive, setIsInteractive] = useState<boolean>(false);
       const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -116,6 +115,7 @@ export const useStaticRender = <P extends object>(
         />
       );
     };
+    return Component;
   }, [prototypeMarkup, baseElement, hydrationDelay, displayContents]);
 
   return { StaticItem };
