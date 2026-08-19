@@ -52,7 +52,8 @@ jobs:
       - name: Push tags
         run: |
           git pull origin main --no-rebase
-          git push origin main --tags
+          git push origin main
+          git push origin --tags
 
       - name: Publish to NPM
         run: npm publish --access public
