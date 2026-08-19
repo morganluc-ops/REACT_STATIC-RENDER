@@ -105,5 +105,3 @@ export const useStaticRender = <P extends object>(
 
   return { StaticItem };
 };
-
-
