@@ -12,6 +12,11 @@ on:
           - patch
           - minor
           - major
+      dry_run:
+        description: "Dry run (simulate release without pushing changes or publishing to NPM)"
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   publish:
@@ -50,17 +55,25 @@ jobs:
         run: 'npm version ${{ inputs.release_type }} -m "chore(release): %s"'
 
       - name: Synchronize and push changes
+        if: ${{ !inputs.dry_run }}
         run: |
           for i in {1..3}; do
             git pull origin main --rebase && git push origin main --follow-tags && break || sleep 2
           done
 
       - name: Publish to NPM
-        run: npm publish --access public
+        run: |
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            echo "Dry run mode enabled: executing npm publish --dry-run"
+            npm publish --dry-run --access public
+          else
+            npm publish --access public
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Create GitHub Release
+        if: ${{ !inputs.dry_run }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
