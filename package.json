@@ -1,6 +1,6 @@
 {
   "name": "react-lazy-hydration-hook",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A React hook/HOC to lazy hydrate components on user interaction (hover, focus, keyboard)",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
