@@ -52,7 +52,7 @@ jobs:
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Bump version
-        run: 'npm version ${{ inputs.release_type }} -m "chore(release): %s"'
+        run: 'npm version ${{ inputs.release_type }} --force -m "chore(release): %s"'
 
       - name: Synchronize and push changes
         if: ${{ !inputs.dry_run }}
