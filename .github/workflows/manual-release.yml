@@ -52,7 +52,9 @@ jobs:
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Bump version
-        run: 'npm version ${{ inputs.release_type }} --force -m "chore(release): %s"'
+        env:
+          RELEASE_TYPE: ${{ inputs.release_type }}
+        run: 'npm version "$RELEASE_TYPE" --force -m "chore(release): %s"'
 
       - name: Synchronize and push changes
         if: ${{ !inputs.dry_run }}
@@ -62,15 +64,16 @@ jobs:
           done
 
       - name: Publish to NPM
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          if [ "${{ inputs.dry_run }}" = "true" ]; then
+          if [ "$DRY_RUN" = "true" ]; then
             echo "Dry run mode enabled: executing npm publish --dry-run"
             npm publish --dry-run --access public
           else
             npm publish --access public
           fi
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Create GitHub Release
         if: ${{ !inputs.dry_run }}
